@@ -400,7 +400,7 @@ void MainWindow::slot_set_return_pos()
 
 void MainWindow::slot_return_pos()
 {
-    qnode.set_goal(ui.return_x->text().toDouble(),ui.return_y->text().toDouble(),ui.return_z->text().toDouble());
+    //qnode.set_goal(ui.return_x->text().toDouble(),ui.return_y->text().toDouble(),ui.return_z->text().toDouble());
 }
 
 void MainWindow::slot_update_pos(double x, double y, double z)
@@ -585,10 +585,87 @@ void MainWindow::slot_rockKeyChange(int key){
   }
 }
 
+void MainWindow::slot_speed_x(double x)
+{
+//    speedDashBoard->set_speed(abs(x * 100));
+//    if (x > 0.001) {
+//      speedDashBoard->set_gear(CCtrlDashBoard::kGear_D);
+//    } else if (x < -0.001) {
+//      speedDashBoard->set_gear(CCtrlDashBoard::kGear_R);
+//    } else {
+//      speedDashBoard->set_gear(CCtrlDashBoard::kGear_N);
+//    }
+//    QString number = QString::number(abs(x * 100)).mid(0, 2);
+//    if (number[1] == ".") {
+//      number = number.mid(0, 1);
+//    }
+    //    ui.label_speed->setText(number);
+}
+
+void MainWindow::slot_cmd_control()
+{
+    QPushButton *btn = qobject_cast<QPushButton *>(sender());
+    char key = btn->text().toStdString()[0];
+    //速度
+    float liner = ui.horizontalSlider_linear->value() * 0.01;
+    float turn = ui.horizontalSlider_raw->value() * 0.01;
+    bool is_all = ui.checkBox_isAll->isChecked();
+    switch (key) {
+      case 'u':
+        qnode.move_base(is_all ? 'U' : 'u', liner, turn);
+        break;
+      case 'i':
+        qnode.move_base(is_all ? 'I' : 'i', liner, turn);
+        break;
+      case 'o':
+        qnode.move_base(is_all ? 'O' : 'o', liner, turn);
+        break;
+      case 'j':
+        qnode.move_base(is_all ? 'J' : 'j', liner, turn);
+        break;
+      case 'l':
+        qnode.move_base(is_all ? 'L' : 'l', liner, turn);
+        break;
+      case 'm':
+        qnode.move_base(is_all ? 'M' : 'm', liner, turn);
+        break;
+      case ',':
+        qnode.move_base(is_all ? '<' : ',', liner, turn);
+        break;
+      case '.':
+        qnode.move_base(is_all ? '>' : '.', liner, turn);
+        break;
+    }
+}
+void MainWindow::slot_move_camera_btn() { emit signalSetMoveCamera(); }
+
+void MainWindow::slot_show_image(int frame_id, QImage image)
+{
+    switch (frame_id) {
+      case 0:
+        ui.label_video0->setPixmap(QPixmap::fromImage(image).scaled(
+            ui.label_video0->width(), ui.label_video0->height()));
+        break;
+      case 1:
+        ui.label_video1->setPixmap(QPixmap::fromImage(image).scaled(
+            ui.label_video1->width(), ui.label_video1->height()));
+        break;
+      case 2:
+        ui.label_video2->setPixmap(QPixmap::fromImage(image).scaled(
+            ui.label_video2->width(), ui.label_video2->height()));
+        break;
+      case 3:
+        ui.label_video3->setPixmap(QPixmap::fromImage(image).scaled(
+            ui.label_video3->width(), ui.label_video3->height()));
+        break;
+    }
+}
+//滑动条处理槽函数
 void MainWindow::slot_linear_value_change(int value)
 {
     ui.label_linear->setText(QString::number(value));
 }
+//滑动条处理槽函数
 void MainWindow::slot_raw_value_change(int value)
 {
     ui.label_raw->setText(QString::number(value));
@@ -676,37 +753,103 @@ void MainWindow::on_actionAbout_triggered() {
 ** Implementation [Configuration]
 *****************************************************************************/
 
+bool MainWindow::connectMaster(QString master_ip, QString ros_ip,
+                               bool use_envirment) {
+  //如果使用环境变量
+  if (use_envirment) {
+    if (!qnode.init()) {
+      return false;
+    } else {
+//      //初始化视频订阅的显示
+      initVideos();
+//      //显示话题列表
+//      initTopicList();
+//      initOthers();
+    }
+  }
+  //如果不使用环境变量
+  else {
+    if (!qnode.init(master_ip.toStdString(), ros_ip.toStdString())) {
+      return false;
+    } else {
+      //初始化视频订阅的显示
+      initVideos();
+//      //显示话题列表
+//      initTopicList();
+//      initOthers();
+    }
+  }
+  ReadSettings();
+  return true;
+}
+
+void MainWindow::initVideos()
+{
+    QSettings video_topic_setting("rosqt_gui", "settings");
+    QStringList names = video_topic_setting.value("video/names").toStringList();
+    QStringList topics = video_topic_setting.value("video/topics").toStringList();
+    if (topics.size() == 4) {
+      if (topics[0] != "") qnode.Sub_Image(topics[0], 0);
+      if (topics[1] != "") qnode.Sub_Image(topics[1], 1);
+      if (topics[2] != "") qnode.Sub_Image(topics[2], 2);
+      if (topics[3] != "") qnode.Sub_Image(topics[3], 3);
+    }
+
+    //链接槽函数
+    connect(&qnode, SIGNAL(Show_image(int, QImage)), this,
+            SLOT(slot_show_image(int, QImage)));
+}
+
 void MainWindow::ReadSettings() {
-    QSettings settings("Qt-Ros Package", "rosqt_gui");
+    QSettings settings("rosqt_gui", "settings");
     restoreGeometry(settings.value("geometry").toByteArray());
     restoreState(settings.value("windowState").toByteArray());
-    QString master_url = settings.value("master_url",QString("http://192.168.1.2:11311/")).toString();
-    QString host_url = settings.value("host_url", QString("192.168.1.3")).toString();
-    //QString topic_name = settings.value("topic_name", QString("/chatter")).toString();
-    ui.line_edit_master->setText(master_url);
-    ui.line_edit_host->setText(host_url);
-    //ui.line_edit_topic->setText(topic_name);
-    bool remember = settings.value("remember_settings", false).toBool();
-    ui.checkbox_remember_settings->setChecked(remember);
-    bool checked = settings.value("use_environment_variables", false).toBool();
-    ui.checkbox_use_environment->setChecked(checked);
-    if ( checked ) {
-    	ui.line_edit_master->setEnabled(false);
-    	ui.line_edit_host->setEnabled(false);
-    	//ui.line_edit_topic->setEnabled(false);
+//    QString master_url = settings.value("master_url",QString("http://192.168.1.2:11311/")).toString();
+//    QString host_url = settings.value("host_url", QString("192.168.1.3")).toString();
+//    //QString topic_name = settings.value("topic_name", QString("/chatter")).toString();
+//    ui.line_edit_master->setText(master_url);
+//    ui.line_edit_host->setText(host_url);
+//    //ui.line_edit_topic->setText(topic_name);
+//    bool remember = settings.value("remember_settings", false).toBool();
+//    ui.checkbox_remember_settings->setChecked(remember);
+//    bool checked = settings.value("use_environment_variables", false).toBool();
+//    ui.checkbox_use_environment->setChecked(checked);
+//    if ( checked ) {
+//    	ui.line_edit_master->setEnabled(false);
+//    	ui.line_edit_host->setEnabled(false);
+//    	//ui.line_edit_topic->setEnabled(false);
+//    }
+    m_masterUrl =
+        settings.value("connect/master_url", QString("http://192.168.1.2:11311/"))
+            .toString();
+    m_hostUrl =
+        settings.value("connect/host_url", QString("192.168.1.3")).toString();
+    m_useEnviorment =
+        settings.value("connect/use_enviorment", bool(false)).toBool();
+    m_autoConnect = settings.value("connect/auto_connect", bool(false)).toBool();
+    m_turnLightThre =
+        settings.value("connect/lineEdit_turnLightThre", double(0.1)).toDouble();
+    if (settings.value("main/show_mode", "control").toString() == "control") {
+      m_showMode = SHOWMODE::control;
+    } else {
+      m_showMode = SHOWMODE::robot;
     }
 }
 
 void MainWindow::WriteSettings() {
-    QSettings settings("Qt-Ros Package", "rosqt_gui");
-    settings.setValue("master_url",ui.line_edit_master->text());
-    settings.setValue("host_url",ui.line_edit_host->text());
-    //settings.setValue("topic_name",ui.line_edit_topic->text());
-    settings.setValue("use_environment_variables",QVariant(ui.checkbox_use_environment->isChecked()));
-    settings.setValue("geometry", saveGeometry());
-    settings.setValue("windowState", saveState());
-    settings.setValue("remember_settings",QVariant(ui.checkbox_remember_settings->isChecked()));
-
+    QSettings windows_setting("rosqt_gui", "window");
+//    settings.setValue("master_url",ui.line_edit_master->text());
+//    settings.setValue("host_url",ui.line_edit_host->text());
+//    //settings.setValue("topic_name",ui.line_edit_topic->text());
+//    settings.setValue("use_environment_variables",QVariant(ui.checkbox_use_environment->isChecked()));
+//    settings.setValue("geometry", saveGeometry());
+//    settings.setValue("windowState", saveState());
+//    settings.setValue("remember_settings",QVariant(ui.checkbox_remember_settings->isChecked()));
+    windows_setting.clear();  //清空当前配置文件中的内容
+    windows_setting.setValue("WindowGeometry/x", this->x());
+    windows_setting.setValue("WindowGeometry/y", this->y());
+    windows_setting.setValue("WindowGeometry/width", this->width());
+    windows_setting.setValue("WindowGeometry/height", this->height());
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

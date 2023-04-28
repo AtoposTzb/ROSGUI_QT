@@ -17,11 +17,24 @@
 #include "qnode.hpp"
 #include "CCtrlDashBoard.hpp"
 #include "qrviz.hpp"
+#include "joystick.h"
+
+#include <sensor_msgs/BatteryState.h>
+#include <QComboBox>
+#include <QDesktopWidget>
+#include <QHBoxLayout>
+#include <QQueue>
+#include <QSoundEffect>
+#include <QSpinBox>
+#include <QStandardItemModel>
+#include <QTimer>
+#include <QTreeWidgetItem>
+#include <QVBoxLayout>
+#include <QVariant>
 #include <QImage>
 #include <QProcess>//激光雷达
-#include <QComboBox>
-#include <QSpinBox>
-#include "joystick.h"
+#include <map>
+
 /*****************************************************************************
 ** Namespace
 *****************************************************************************/
@@ -35,27 +48,34 @@ namespace rosqt_gui {
  * @brief Qt central, all operations relating to the view part here.
  */
 class MainWindow : public QMainWindow {
-Q_OBJECT
+    Q_OBJECT
 
 public:
-	MainWindow(int argc, char** argv, QWidget *parent = 0);
-	~MainWindow();
+    MainWindow(int argc, char** argv, QWidget *parent = 0);
+    ~MainWindow();
 
     enum {upleft=0,up,upright,left,stop,right,downleft,down,downright};
 
-	void ReadSettings(); // Load up qt program settings at startup
-	void WriteSettings(); // Save qt program settings when closing
+    void ReadSettings(); // Load up qt program settings at startup
+    void WriteSettings(); // Save qt program settings when closing
 
-	void closeEvent(QCloseEvent *event); // Overloaded function
-	void showNoMasterMessage();
+    void closeEvent(QCloseEvent *event); // Overloaded function
+    void showNoMasterMessage();
+    bool connectMaster(QString master_ip, QString ros_ip, bool use_envirment);
+
+    void initVideos();
+    enum SHOWMODE {
+        robot,
+        control,
+    };
 
 public Q_SLOTS:
-	/******************************************
-	** Auto-connections (connectSlotsByName())
-	*******************************************/
-	void on_actionAbout_triggered();
-	void on_button_connect_clicked(bool check );
-	void on_checkbox_use_environment_stateChanged(int state);
+    /******************************************
+    ** Auto-connections (connectSlotsByName())
+    *******************************************/
+    void on_actionAbout_triggered();
+    void on_button_connect_clicked(bool check );
+    void on_checkbox_use_environment_stateChanged(int state);
 
     /******************************************
     ** Manual connections
@@ -84,17 +104,42 @@ public Q_SLOTS:
     void slot_update_pos(double,double,double);
     void slot_set_return_pos();
     void slot_return_pos();
+    //new
     //遥感
     void slot_rockKeyChange(int);
+    void slot_batteryState(sensor_msgs::BatteryState);
 
+    void slot_speed_x(double x);
+    void slot_speed_yaw(double yaw);
+    void slot_cmd_control();
+    void slot_move_camera_btn();
+    //显示图像
+    void slot_show_image(int, QImage);
+    void slot_dis_connect();
+    void slot_hide_table_widget();
+    void slot_closeWindows();
+    void slot_minWindows();
+    void slot_maxWindows();
+    void slot_chartTimerTimeout();
+    void slot_pubImageMapTimeOut();
+    void slot_updateCursorPos(QPointF pos);
+    void slot_changeMapType(int);
 private:
-	Ui::MainWindowDesign ui;
-	QNode qnode;
+    Ui::MainWindowDesign ui;
+    QNode qnode;
     CCtrlDashBoard* speed_x_dashBoard;
     CCtrlDashBoard* speed_y_dashBoard;
     QProcess *laser_cmd;
+    //登陆
+    bool m_useEnviorment = false;
+    bool m_autoConnect = false;
+    SHOWMODE m_showMode;
+    QString m_masterUrl;
+    QString m_hostUrl;
+    double m_turnLightThre = 0.1;
+    CCtrlDashBoard *speedDashBoard;
 
-//rviz
+    //rviz
     qrviz *myqrviz;
     QComboBox* fixed_box;
     QSpinBox* Cell_Count_Box;
@@ -115,6 +160,13 @@ private:
     QComboBox* Local_Planner_Color_box;
     //遥感
     JoyStick *rock_widget;
+
+signals:
+    void signalSetMoveCamera();
+    void signalSet2DPose();
+    void signalSet2DGoal();
+    void signalDisconnect();
+
 };
 
 }  // namespace rosqt_gui

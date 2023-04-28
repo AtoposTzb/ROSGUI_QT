@@ -21,6 +21,7 @@
 #include <QProcess>//激光雷达
 #include <QComboBox>
 #include <QSpinBox>
+#include "joystick.h"
 /*****************************************************************************
 ** Namespace
 *****************************************************************************/
@@ -39,6 +40,8 @@ Q_OBJECT
 public:
 	MainWindow(int argc, char** argv, QWidget *parent = 0);
 	~MainWindow();
+
+    enum {upleft=0,up,upright,left,stop,right,downleft,down,downright};
 
 	void ReadSettings(); // Load up qt program settings at startup
 	void WriteSettings(); // Save qt program settings when closing
@@ -81,6 +84,8 @@ public Q_SLOTS:
     void slot_update_pos(double,double,double);
     void slot_set_return_pos();
     void slot_return_pos();
+    //遥感
+    void slot_rockKeyChange(int);
 
 private:
 	Ui::MainWindowDesign ui;
@@ -108,6 +113,8 @@ private:
     QComboBox* LocalMapColorScheme_box;
     QComboBox* Local_Planner_Topic_box;
     QComboBox* Local_Planner_Color_box;
+    //遥感
+    JoyStick *rock_widget;
 };
 
 }  // namespace rosqt_gui

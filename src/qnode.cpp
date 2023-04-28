@@ -51,6 +51,8 @@ bool QNode::init() {
 	// Add your ros communications here.
 	chatter_publisher = n.advertise<std_msgs::String>("chatter", 1000);
     chatter_sub = n.subscribe("chatter",1000,&QNode::chatter_callback,this);
+    //速度控制话题
+    cmd_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
     cmd_vel_pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1000);
     odom_sub = n.subscribe("raw_odom",1000,&QNode::odom_callback,this);//odom_callback回调函数
     power_sub = n.subscribe("power",1000,&QNode::power_callback,this);
@@ -74,6 +76,8 @@ bool QNode::init(const std::string &master_url, const std::string &host_url) {
 	chatter_publisher = n.advertise<std_msgs::String>("chatter", 1000);
     chatter_sub = n.subscribe("chatter",1000,&QNode::chatter_callback,this);
     cmd_vel_pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1000);
+    //速度控制话题
+    cmd_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
     odom_sub = n.subscribe("raw_odom",1000,&QNode::odom_callback,this);//odom_callback回调函数
     power_sub = n.subscribe("power",1000,&QNode::power_callback,this);
     amcl_pose_sub=n.subscribe("amcl_pose",1000,&QNode::amcl_pose_callback,this);
@@ -219,7 +223,39 @@ void QNode::set_cmd_vel(char k,float linear,float angular)
       cmd_vel_pub.publish(twist);//发布这个话题
       //接口函数写好了，去mainWindow里调用
 }
+//发布机器人速度控制
+void QNode::move_base(char k, float speed_linear, float speed_trun) {
+  std::map<char, std::vector<float>> moveBindings{
+      {'i', {1, 0, 0, 0}},  {'o', {1, 0, 0, -1}},  {'j', {0, 0, 0, 1}},
+      {'l', {0, 0, 0, -1}}, {'u', {1, 0, 0, 1}},   {',', {-1, 0, 0, 0}},
+      {'.', {-1, 0, 0, 1}}, {'m', {-1, 0, 0, -1}}, {'O', {1, -1, 0, 0}},
+      {'I', {1, 0, 0, 0}},  {'J', {0, 1, 0, 0}},   {'L', {0, -1, 0, 0}},
+      {'U', {1, 1, 0, 0}},  {'<', {-1, 0, 0, 0}},  {'>', {-1, -1, 0, 0}},
+      {'M', {-1, 1, 0, 0}}, {'t', {0, 0, 1, 0}},   {'b', {0, 0, -1, 0}},
+      {'k', {0, 0, 0, 0}},  {'K', {0, 0, 0, 0}}};
+  char key = k;
+  //计算是往哪个方向
+  float x = moveBindings[key][0];
+  float y = moveBindings[key][1];
+  float z = moveBindings[key][2];
+  float th = moveBindings[key][3];
+  //计算线速度和角速度
+  float speed = speed_linear;
+  float turn = speed_trun;
+  // Update the Twist message
+  geometry_msgs::Twist twist;
+  twist.linear.x = x * speed;
+  twist.linear.y = y * speed;
+  twist.linear.z = z * speed;
 
+  twist.angular.x = 0;
+  twist.angular.y = 0;
+  twist.angular.z = th * turn;
+
+  // Publish it and resolve any remaining callbacks
+  cmd_pub.publish(twist);
+  ros::spinOnce();
+}
 void QNode::chatter_callback(const std_msgs::String &msg)
 {
     log(Info,"I recive: "+msg.data);

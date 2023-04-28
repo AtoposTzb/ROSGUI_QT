@@ -53,6 +53,7 @@ public:
 	bool init();
 	bool init(const std::string &master_url, const std::string &host_url);
     void set_cmd_vel(char k,float linear,float angular);//一个公共函数去连接键盘控制和速度的功能
+    void move_base(char k, float speed_linear, float speed_trun);
     void sub_image(QString topic_name);
     void set_goal(double x, double y, double z);
 	void run();
@@ -84,6 +85,7 @@ private:
 	char** init_argv;
 	ros::Publisher chatter_publisher;
     ros::Publisher cmd_vel_pub;//声明一个话题发布者
+    ros::Publisher cmd_pub;
     ros::Publisher goal_pub;//发布导航目标点的话题发布者S
 
     QStringListModel logging_model;

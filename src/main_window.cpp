@@ -44,6 +44,9 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent)
 	ui.view_logging->setModel(qnode.loggingModel());
     QObject::connect(&qnode, SIGNAL(loggingUpdated()), this, SLOT(updateLoggingView()));
 
+    //初始化遥感UI
+    rock_widget = new JoyStick(ui.JoyStick_widget);
+    rock_widget->show();
     /*********************
     ** Auto Start
     **********************/
@@ -366,6 +369,9 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent)
     //
     connect(ui.set_return_pos_btn,SIGNAL(clicked()),this,SLOT(slot_set_return_pos()));
     connect(ui.return_pos_btn,SIGNAL(clicked()),this,SLOT(slot_return_pos()));
+    //连接遥感
+    connect(rock_widget, SIGNAL(keyNumchanged(int)), this,SLOT(slot_rockKeyChange(int)));
+
 }
 
 
@@ -544,6 +550,39 @@ void MainWindow::slot_pushbtn_click()
         qnode.set_cmd_vel(is_all?'>':'.' ,linear ,angular);
         break;
     }
+}
+void MainWindow::slot_rockKeyChange(int key){
+  qDebug()<<"key: "<<key;
+  //速度
+  float liner=ui.horizontalSlider_linear->value()*0.01;
+  float turn=ui.horizontalSlider_raw->value()*0.01;
+  bool is_all=ui.checkBox_isAll->isChecked();
+  switch (key) {
+      case upleft:
+          qnode.move_base(is_all?'U':'u',liner,turn);
+      break;
+      case up:
+          qnode.move_base(is_all?'I':'i',liner,turn);
+      break;
+      case upright:
+          qnode.move_base(is_all?'O':'o',liner,turn);
+      break;
+      case left:
+          qnode.move_base(is_all?'J':'j',liner,turn);
+      break;
+      case right:
+          qnode.move_base(is_all?'L':'l',liner,turn);
+      break;
+      case down:
+          qnode.move_base(is_all?'M':'m',liner,turn);
+      break;
+      case downleft:
+          qnode.move_base(is_all?'<':',',liner,turn);
+      break;
+      case downright:
+          qnode.move_base(is_all?'>':'.',liner,turn);
+      break;
+  }
 }
 
 void MainWindow::slot_linear_value_change(int value)

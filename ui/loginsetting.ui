@@ -6,18 +6,21 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>820</width>
-    <height>577</height>
+    <width>634</width>
+    <height>538</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(211, 215, 207);</string>
+  </property>
   <layout class="QGridLayout" name="gridLayout_4">
    <item row="0" column="0">
     <widget class="QStackedWidget" name="stackedWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="page">
       <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -610,14 +613,14 @@ background-color:none</string>
             <item>
              <widget class="QToolBox" name="toolBox">
               <property name="currentIndex">
-               <number>0</number>
+               <number>2</number>
               </property>
               <widget class="QWidget" name="page_3">
                <property name="geometry">
                 <rect>
                  <x>0</x>
                  <y>0</y>
-                 <width>675</width>
+                 <width>580</width>
                  <height>253</height>
                 </rect>
                </property>
@@ -772,8 +775,8 @@ background-color:none</string>
                 <rect>
                  <x>0</x>
                  <y>0</y>
-                 <width>689</width>
-                 <height>225</height>
+                 <width>594</width>
+                 <height>224</height>
                 </rect>
                </property>
                <attribute name="label">
@@ -833,8 +836,8 @@ background-color:none</string>
                 <rect>
                  <x>0</x>
                  <y>0</y>
-                 <width>689</width>
-                 <height>225</height>
+                 <width>594</width>
+                 <height>224</height>
                 </rect>
                </property>
                <attribute name="label">
@@ -857,7 +860,7 @@ background-color:none</string>
                 <rect>
                  <x>0</x>
                  <y>0</y>
-                 <width>675</width>
+                 <width>580</width>
                  <height>344</height>
                 </rect>
                </property>
@@ -1182,8 +1185,8 @@ background-color:none</string>
                 <rect>
                  <x>0</x>
                  <y>0</y>
-                 <width>689</width>
-                 <height>225</height>
+                 <width>594</width>
+                 <height>224</height>
                 </rect>
                </property>
                <attribute name="label">

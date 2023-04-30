@@ -56,6 +56,8 @@
 #include <QtConcurrent/QtConcurrent>
 
 
+typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>
+    MoveBaseClient;
 /*****************************************************************************
 ** Namespaces
 *****************************************************************************/
@@ -82,6 +84,8 @@ public:
     void pub_imageMap(QImage map);
     QPointF transScenePoint2Word(QPointF pos);
     QPointF transWordPoint2Scene(QPointF pos);
+    int mapWidth{0};
+    int mapHeight{0};
 	void run();
 
 	/*********************
@@ -94,7 +98,7 @@ public:
 	         Error,
 	         Fatal
 	 };
-
+    enum RobotStatus { none, normal, warn, error };
 	QStringListModel* loggingModel() { return &logging_model; }
 	void log( const LogLevel &level, const std::string &msg);
 
@@ -102,7 +106,7 @@ Q_SIGNALS:
 	void loggingUpdated();
     void rosShutdown();
     void speed_vel(float,float);//因为这是两个类,ui界面是在mianw访问，所以这里需要我们创建自定义信号，把当前的X,Y轴线速度通过信号的方式发送到mainw类中
-    void power_vel(float);
+    //void power_vel(float);
     void image_val(QImage);
     void position(double x,double y,double z);
     void batteryState(sensor_msgs::BatteryState);
@@ -113,6 +117,7 @@ Q_SIGNALS:
     void speed_x(double x);
     void speed_y(double y);
     void plannerPath(QPolygonF path);
+    void updateRobotStatus(RobotStatus status);
 
 
 private:
@@ -129,9 +134,8 @@ private:
     ros::Subscriber chatter_sub;//创建一个订阅者
     ros::Subscriber odom_sub;//里程计话题订阅者
 
-    ros::Subscriber power_sub;//电池电压
-    ros::Subscriber battery_sub;
-
+    //ros::Subscriber power_sub;//电池电压
+    ros::Subscriber battery_sub;//电池
     ros::Subscriber amcl_pose_sub;//位姿的
     //图像
     image_transport::Subscriber image_sub;
@@ -183,7 +187,7 @@ private:
 private:
     void chatter_callback(const std_msgs::String &msg);//shengminghuidiaohanshu
     void odom_callback(const nav_msgs::Odometry &msg);
-    void power_callback(const std_msgs::Float32 &msg);
+    //void power_callback(const std_msgs::Float32 &msg);
     void image_callback(const sensor_msgs::ImageConstPtr &msg);
     void amcl_pose_callback(const geometry_msgs::PoseWithCovarianceStamped &msg);
 

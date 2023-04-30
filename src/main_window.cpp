@@ -31,28 +31,41 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent)
 	, qnode(argc,argv)
 {
 	ui.setupUi(this); // Calling this incidentally connects all ui's triggers to on_...() callbacks in this class.
-    QObject::connect(ui.actionAbout_Qt, SIGNAL(triggered(bool)), qApp, SLOT(aboutQt())); // qApp is a global variable for the application
+    //QObject::connect(ui.actionAbout_Qt, SIGNAL(triggered(bool)), qApp, SLOT(aboutQt())); // qApp is a global variable for the application
 
     ReadSettings();
+    initUis();
 	setWindowIcon(QIcon(":/images/icon.png"));
-	ui.tab_manager->setCurrentIndex(0); // ensure the first tab is showing - qt-designer should have this already hardwired, but often loses it (settings?).
-    QObject::connect(&qnode, SIGNAL(rosShutdown()), this, SLOT(close()));
+    //ui.tab_manager->setCurrentIndex(0); // ensure the first tab is showing - qt-designer should have this already hardwired, but often loses it (settings?).
+    //QObject::connect(&qnode, SIGNAL(rosShutdown()), this, SLOT(close()));
 
 	/*********************
 	** Logging
 	**********************/
 	ui.view_logging->setModel(qnode.loggingModel());
-    QObject::connect(&qnode, SIGNAL(loggingUpdated()), this, SLOT(updateLoggingView()));
+    //QObject::connect(&qnode, SIGNAL(loggingUpdated()), this, SLOT(updateLoggingView()));
 
-    //初始化遥感UI
-    rock_widget = new JoyStick(ui.JoyStick_widget);
-    rock_widget->show();
-    /*********************
-    ** Auto Start
-    **********************/
-    if ( ui.checkbox_remember_settings->isChecked() ) {
-        on_button_connect_clicked(true);
-    }
+    //连接里程信息
+    connect(&qnode,SIGNAL(speed_vel(float,float)),this,SLOT(slot_update_dashboard(float,float)));
+    //连接电池电压
+    //connect(&qnode,SIGNAL(power_vel(float)),this,SLOT(slot_update_power(float)));
+    //连接图像话题
+    connect(&qnode,SIGNAL(image_val(QImage)),this,SLOT(slot_update_image(QImage)));
+    connect(ui.pushButton_sub_image,SIGNAL(clicked()),this,SLOT(slot_sub_image()));
+    //激光雷达
+    connect(ui.pushButton_laser,SIGNAL(clicked()),this,SLOT(slot_quick_cmd_laser()));
+    //坐标 返航点
+    connect(&qnode,SIGNAL(position(double,double,double)),this,SLOT(slot_update_pos(double,double,double)));
+    //set start pose
+    connect(ui.set_start_btn,SIGNAL(clicked()),this,SLOT(slot_set_start_pose()));
+    connect(ui.set_goal_btn,SIGNAL(clicked()),this,SLOT(slot_set_goal_pose()));
+
+    //
+    connect(ui.set_return_pos_btn,SIGNAL(clicked()),this,SLOT(slot_set_return_pos()));
+    connect(ui.return_pos_btn,SIGNAL(clicked()),this,SLOT(slot_return_pos()));
+    //连接遥感
+    connect(rock_widget, SIGNAL(keyNumchanged(int)), this,SLOT(slot_rockKeyChange(int)));
+
     //连接角速度线速度进度条显示
     connect(ui.horizontalSlider_linear,SIGNAL(valueChanged(int)),this,SLOT(slot_linear_value_change(int)));
     connect(ui.horizontalSlider_raw,SIGNAL(valueChanged(int)),this,SLOT(slot_raw_value_change(int)));
@@ -66,6 +79,72 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent)
     connect(ui.pushButton_dou,SIGNAL(clicked()),this,SLOT(slot_pushbtn_click()));
 
 
+    connections();
+
+}
+void MainWindow::display_rviz()
+{
+    QSettings settings("ros_qt5_gui_app", "Displays");
+    bool Grid_enable = settings.value("Grid/enable", bool(true)).toBool();
+    double Grid_count = settings.value("Grid/count", double(20)).toDouble();
+
+    bool Map_enable = settings.value("Map/enable", bool(true)).toBool();
+    QString Map_topic = settings.value("Map/topic", QString("/map")).toString();
+    double Map_alpha = settings.value("Map/alpha", double(0.7)).toDouble();
+    QString Map_scheme = settings.value("Map/scheme", QString("map")).toString();
+    bool Laser_enable = settings.value("Laser/enable", bool(true)).toBool();
+    QString Laser_topic =
+        settings.value("Laser/topic", QString("/scan")).toString();
+    bool Polygon_enable = settings.value("Polygon/enable", bool(true)).toBool();
+    QString Polygon_topic =
+        settings
+            .value("Polygon/topic", QString("/move_base/local_costmap/footprint"))
+            .toString();
+
+    bool RobotModel_enable =
+        settings.value("RobotModel/enable", bool(true)).toBool();
+    bool Navigation_enable =
+        settings.value("Navigation/enable", bool(true)).toBool();
+    QString GlobalMap_topic =
+        settings
+            .value("Navigation/GlobalMap/topic",
+                   QString("/move_base/global_costmap/costmap"))
+            .toString();
+    QString GlobalMap_paln = settings
+                                 .value("Navigation/GlobalPlan/topic",
+                                        QString("/move_base/NavfnROS/plan"))
+                                 .toString();
+    QString LocalMap_topic =
+        settings
+            .value("Navigation/LocalMap/topic",
+                   QString("/move_base/local_costmap/costmap"))
+            .toString();
+    QString LocalMap_plan =
+        settings
+            .value("Navigation/LocalPlan/topic",
+                   QString("/move_base/DWAPlannerROS/local_plan"))
+            .toString();
+}
+
+void MainWindow::initUis()
+{
+    //ui.tab_manager->setCurrentIndex(0); // ensure the first tab is showing - qt-designer should have this already hardwired, but often loses it (settings?).
+    //初始化遥感UI
+    rock_widget = new JoyStick(ui.JoyStick_widget);
+    rock_widget->show();
+
+    //时间动态显示
+    m_timerCurrentTime = new QTimer;
+    m_timerCurrentTime->setInterval(100);
+    m_timerCurrentTime->start();
+
+    /*********************
+    ** Auto Start
+    **********************/
+//    if ( ui.checkbox_remember_settings->isChecked() ) {
+//        on_button_connect_clicked(true);
+//    }
+
     //速度仪表盘实现
     //初始化u
     speed_x_dashBoard = new CCtrlDashBoard(ui.widget_speed_x);
@@ -77,6 +156,32 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent)
     ui.horizontalSlider_linear->setValue(50);//设置默认
     ui.horizontalSlider_raw->setValue(50);
 
+    ui.pushButton_status->setIcon(QIcon("://images/status/status_none.png"));
+    ui.min_btn->setIcon(QIcon("://images/min.png"));
+    ui.max_btn->setIcon(QIcon("://images/max.png"));
+    ui.close_btn->setIcon(QIcon("://images/close.png"));
+
+    if (m_showMode == SHOWMODE::robot) {
+      this->showFullScreen();
+    } else {
+      QSettings windows_setting("rosqt_gui", "windows");
+      int x = windows_setting.value("WindowGeometry/x").toInt();
+      int y = windows_setting.value("WindowGeometry/y").toInt();
+      int width = windows_setting.value("WindowGeometry/width").toInt();
+      int height = windows_setting.value("WindowGeometry/height").toInt();
+      QDesktopWidget *desktopWidget = QApplication::desktop();
+      QRect clientRect = desktopWidget->availableGeometry();
+      QRect targRect0 = QRect(clientRect.width() / 4, clientRect.height() / 4,
+                              clientRect.width() / 2, clientRect.height() / 2);
+      QRect targRect = QRect(x, y, width, height);
+      if (width == 0 || height == 0 || x < 0 || x > clientRect.width() || y < 0 ||
+          y > clientRect
+                  .height())  //如果上一次关闭软件的时候，窗口位置不正常，则本次显示在显示器的正中央
+      {
+        targRect = targRect0;
+      }
+      this->setGeometry(targRect);  //设置主窗口的大小
+    }
     //rviz
 //    ui.treeWidget->setWindowTitle("Display");
 //    ui.treeWidget->setWindowIcon(QIcon(":/images/display.png")); 使用label替换
@@ -349,31 +454,107 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent)
     Local_Planner->addChild(Local_Planner_Color_Scheme);
     ui.treeWidget->setItemWidget(Local_Planner_Color_Scheme,1,Local_Planner_Color_box);
 
-
-
-    //连接里程信息
-    connect(&qnode,SIGNAL(speed_vel(float,float)),this,SLOT(slot_update_dashboard(float,float)));
-    //连接电池电压
-    connect(&qnode,SIGNAL(power_vel(float)),this,SLOT(slot_update_power(float)));
-    //连接图像话题
-    connect(&qnode,SIGNAL(image_val(QImage)),this,SLOT(slot_update_image(QImage)));
-    connect(ui.pushButton_sub_image,SIGNAL(clicked()),this,SLOT(slot_sub_image()));
-    //激光雷达
-    connect(ui.pushButton_laser,SIGNAL(clicked()),this,SLOT(slot_quick_cmd_laser()));
-    //坐标 返航点
-    connect(&qnode,SIGNAL(position(double,double,double)),this,SLOT(slot_update_pos(double,double,double)));
-    //set start pose
-    connect(ui.set_start_btn,SIGNAL(clicked()),this,SLOT(slot_set_start_pose()));
-    connect(ui.set_goal_btn,SIGNAL(clicked()),this,SLOT(slot_set_goal_pose()));
-
-    //
-    connect(ui.set_return_pos_btn,SIGNAL(clicked()),this,SLOT(slot_set_return_pos()));
-    connect(ui.return_pos_btn,SIGNAL(clicked()),this,SLOT(slot_return_pos()));
-    //连接遥感
-    connect(rock_widget, SIGNAL(keyNumchanged(int)), this,SLOT(slot_rockKeyChange(int)));
-
 }
 
+void MainWindow::initVideos()
+{
+    QSettings video_topic_setting("rosqt_gui", "settings");
+    QStringList names = video_topic_setting.value("video/names").toStringList();
+    QStringList topics = video_topic_setting.value("video/topics").toStringList();
+    if (topics.size() == 4) {
+      if (topics[0] != "") qnode.Sub_Image(topics[0], 0);
+      if (topics[1] != "") qnode.Sub_Image(topics[1], 1);
+      if (topics[2] != "") qnode.Sub_Image(topics[2], 2);
+      if (topics[3] != "") qnode.Sub_Image(topics[3], 3);
+    }
+
+    //链接槽函数
+    connect(&qnode, SIGNAL(Show_image(int, QImage)), this,
+            SLOT(slot_show_image(int, QImage)));
+}
+
+void MainWindow::connections()
+{
+
+    QObject::connect(&qnode, SIGNAL(loggingUpdated()), this,
+                     SLOT(updateLoggingView()));
+    QObject::connect(&qnode, SIGNAL(rosShutdown()), this,
+                     SLOT(slot_rosShutdown()));
+    QObject::connect(&qnode, SIGNAL(Master_shutdown()), this,
+                     SLOT(slot_rosShutdown()));
+    QObject::connect(m_timerCurrentTime, &QTimer::timeout, [=]() {
+      ui.label_time->setText(
+          QDateTime::currentDateTime().toString("  hh:mm:ss  "));
+    });
+    // connect速度的信号
+    connect(&qnode, SIGNAL(speed_x(double)), this, SLOT(slot_speed_x(double)));
+    connect(&qnode, SIGNAL(speed_y(double)), this, SLOT(slot_speed_yaw(double)));
+    //机器人状态
+    connect(&qnode, SIGNAL(updateRobotStatus(RobotStatus)), this,
+            SLOT(slot_updateRobotStatus(RobotStatus)));
+    //电源的信号
+    connect(&qnode, SIGNAL(batteryState(sensor_msgs::BatteryState)), this,
+            SLOT(slot_batteryState(sensor_msgs::BatteryState)));
+    //绑定slider的函数
+//    connect(ui.horizontalSlider_raw, SIGNAL(valueChanged(int)), this,
+//            SLOT(Slider_raw_valueChanged(int)));
+//    connect(ui.horizontalSlider_linear, SIGNAL(valueChanged(int)), this,
+//            SLOT(Slider_linear_valueChanged(int)));
+    //设置界面
+    connect(ui.settings_btn, SIGNAL(clicked()), this, SLOT(slot_setting_frame()));
+    //绑定速度控制按钮
+    connect(ui.pushButton_i, SIGNAL(clicked()), this, SLOT(slot_cmd_control()));
+    connect(ui.pushButton_u, SIGNAL(clicked()), this, SLOT(slot_cmd_control()));
+    connect(ui.pushButton_o, SIGNAL(clicked()), this, SLOT(slot_cmd_control()));
+    connect(ui.pushButton_j, SIGNAL(clicked()), this, SLOT(slot_cmd_control()));
+    connect(ui.pushButton_l, SIGNAL(clicked()), this, SLOT(slot_cmd_control()));
+    connect(ui.pushButton_m, SIGNAL(clicked()), this, SLOT(slot_cmd_control()));
+    connect(ui.pushButton_dou, SIGNAL(clicked()), this,
+            SLOT(slot_cmd_control()));
+    connect(ui.pushButton_dian, SIGNAL(clicked()), this,
+            SLOT(slot_cmd_control()));
+    connect(ui.pushButton, SIGNAL(clicked()), this, SLOT(slot_dis_connect()));
+    //返航
+//    connect(ui.return_btn, SIGNAL(clicked()), this, SLOT(slot_return_point()));
+    connect(ui.close_btn, SIGNAL(clicked()), this, SLOT(slot_closeWindows()));
+    connect(ui.min_btn, SIGNAL(clicked()), this, SLOT(slot_minWindows()));
+    connect(ui.max_btn, SIGNAL(clicked()), this, SLOT(slot_maxWindows()));
+    connect(rock_widget, SIGNAL(keyNumchanged(int)), this,
+            SLOT(slot_rockKeyChange(int)));
+}
+void MainWindow::slot_updateRobotStatus(RobotStatus status)
+{
+    switch (status) {
+      case RobotStatus::none: {
+        QTimer::singleShot(100, [this]() {
+          ui.pushButton_status->setIcon(
+              QIcon(":/images/status/status_none.png"));
+          //m_roboItem->setRobotColor(eRobotColor::blue);
+        });
+      } break;
+      case RobotStatus::normal: {
+        QTimer::singleShot(200, [this]() {
+          ui.pushButton_status->setIcon(
+              QIcon(":/images/status/status_normal.png"));
+          //m_roboItem->setRobotColor(eRobotColor::blue);
+        });
+      } break;
+      case RobotStatus::error: {
+        QTimer::singleShot(300, [this]() {
+          ui.pushButton_status->setIcon(
+              QIcon(":/images/status/status_error.png"));
+          //m_roboItem->setRobotColor(eRobotColor::red);
+        });
+      } break;
+      case RobotStatus::warn: {
+        QTimer::singleShot(400, [this]() {
+          ui.pushButton_status->setIcon(
+              QIcon(":/images/status/status_warn.png"));
+          //m_roboItem->setRobotColor(eRobotColor::yellow);
+        });
+      } break;
+    }
+}
 
 void MainWindow::slot_display_global_map(int state)
 {
@@ -492,14 +673,14 @@ void MainWindow::slot_sub_image()
     qnode.sub_image(ui.lineEdit_image_topic->text());
 }
 
-void MainWindow::slot_update_power(float value)
-{
-    ui.label_power_val->setText(QString::number(value).mid(0,5)+"V");//只取前5个字符
-    //进度条显示，先计算电压比
-    double n = (value-10.5)/(12.5-10.5);//12.5 and 10.5为实体机器人设置的最大和最小电压
-    int val = n*100;//转换为百分比
-    ui.progressBar->setValue(val);
-}
+//void MainWindow::slot_update_power(float value)
+//{
+//    ui.label_power_val->setText(QString::number(value).mid(0,5)+"V");//只取前5个字符
+//    //进度条显示，先计算电压比
+//    double n = (value-10.5)/(12.5-10.5);//12.5 and 10.5为实体机器人设置的最大和最小电压
+//    int val = n*100;//转换为百分比
+//    ui.progressBar->setValue(val);
+//}
 
 void MainWindow::slot_update_dashboard(float x,float y)
 {
@@ -584,24 +765,6 @@ void MainWindow::slot_rockKeyChange(int key){
       break;
   }
 }
-
-void MainWindow::slot_speed_x(double x)
-{
-//    speedDashBoard->set_speed(abs(x * 100));
-//    if (x > 0.001) {
-//      speedDashBoard->set_gear(CCtrlDashBoard::kGear_D);
-//    } else if (x < -0.001) {
-//      speedDashBoard->set_gear(CCtrlDashBoard::kGear_R);
-//    } else {
-//      speedDashBoard->set_gear(CCtrlDashBoard::kGear_N);
-//    }
-//    QString number = QString::number(abs(x * 100)).mid(0, 2);
-//    if (number[1] == ".") {
-//      number = number.mid(0, 1);
-//    }
-    //    ui.label_speed->setText(number);
-}
-
 void MainWindow::slot_cmd_control()
 {
     QPushButton *btn = qobject_cast<QPushButton *>(sender());
@@ -637,6 +800,63 @@ void MainWindow::slot_cmd_control()
         break;
     }
 }
+void MainWindow::slot_batteryState(sensor_msgs::BatteryState msg)
+{
+    ui.label_power_val->setText(QString::number(msg.voltage).mid(0, 5) + "V");
+    double percentage = msg.percentage;
+    //speedDashBoard->set_oil(percentage);
+    ui.progressBar->setValue(percentage > 100 ? 100 : percentage);
+    //当电量过低时发出提示
+    if (percentage <= 20) {
+      ui.progressBar->setStyleSheet(
+          "QProgressBar::chunk {background-color: red;width: 20px;} QProgressBar "
+          "{border: 2px solid grey;border-radius: 5px;text-align: center;}");
+      // QMessageBox::warning(NULL, "电量不足", "电量不足，请及时充电！",
+      // QMessageBox::Yes , QMessageBox::Yes);
+    } else {
+      ui.progressBar->setStyleSheet(
+          "QProgressBar {border: 2px solid grey;border-radius: 5px;text-align: "
+          "center;}");
+    }
+}
+
+void MainWindow::slot_setting_frame()
+{
+}
+
+void MainWindow::slot_speed_x(double x)
+{
+//    speedDashBoard->set_speed(abs(x * 100));
+//    if (x > 0.001) {
+//      speedDashBoard->set_gear(CCtrlDashBoard::kGear_D);
+//    } else if (x < -0.001) {
+//      speedDashBoard->set_gear(CCtrlDashBoard::kGear_R);
+//    } else {
+//      speedDashBoard->set_gear(CCtrlDashBoard::kGear_N);
+//    }
+//    QString number = QString::number(abs(x * 100)).mid(0, 2);
+//    if (number[1] == ".") {
+//      number = number.mid(0, 1);
+//    }
+    //    ui.label_speed->setText(number);
+}
+
+void MainWindow::slot_speed_yaw(double yaw)
+{
+//    if (yaw > m_turnLightThre) {
+//      ui.label_turnLeft->setPixmap(
+//          QPixmap::fromImage(QImage("://images/turnLeft_hl.png")));
+//    } else if (yaw < -m_turnLightThre) {
+//      ui.label_turnRight->setPixmap(
+//          QPixmap::fromImage(QImage("://images/turnRight_hl.png")));
+//    } else {
+//      ui.label_turnLeft->setPixmap(
+//          QPixmap::fromImage(QImage("://images/turnLeft_l.png")));
+//      ui.label_turnRight->setPixmap(
+//          QPixmap::fromImage(QImage("://images/turnRight_l.png")));
+//    }
+}
+
 void MainWindow::slot_move_camera_btn() { emit signalSetMoveCamera(); }
 
 void MainWindow::slot_show_image(int frame_id, QImage image)
@@ -660,99 +880,14 @@ void MainWindow::slot_show_image(int frame_id, QImage image)
         break;
     }
 }
-//滑动条处理槽函数
-void MainWindow::slot_linear_value_change(int value)
+
+void MainWindow::slot_dis_connect()
 {
-    ui.label_linear->setText(QString::number(value));
+    ros::shutdown();
+    slot_rosShutdown();
+    emit signalDisconnect();
+    this->close();
 }
-//滑动条处理槽函数
-void MainWindow::slot_raw_value_change(int value)
-{
-    ui.label_raw->setText(QString::number(value));
-}
-
-MainWindow::~MainWindow() {}
-
-/*****************************************************************************
-** Implementation [Slots]
-*****************************************************************************/
-
-void MainWindow::showNoMasterMessage() {
-	QMessageBox msgBox;
-	msgBox.setText("Couldn't find the ros master.");
-	msgBox.exec();
-    close();
-}
-
-/*
- * These triggers whenever the button is clicked, regardless of whether it
- * is already checked or not.
- */
-
-void MainWindow::on_button_connect_clicked(bool check ) {
-	if ( ui.checkbox_use_environment->isChecked() ) {
-		if ( !qnode.init() ) {
-			showNoMasterMessage();
-            ui.treeWidget->setEnabled(false);//myrviz 对象没有连接上master时,设置为不可用
-		} else {
-			ui.button_connect->setEnabled(false);
-            ui.treeWidget->setEnabled(true);//连接成功时设置为可用,防止被意外调用
-            myqrviz = new qrviz(ui.Layout_rviz);
-		}
-	} else {
-		if ( ! qnode.init(ui.line_edit_master->text().toStdString(),
-				   ui.line_edit_host->text().toStdString()) ) {
-			showNoMasterMessage();
-            ui.treeWidget->setEnabled(false);//myrviz 对象没有连接上master时,设置为不可用
-		} else {
-			ui.button_connect->setEnabled(false);
-			ui.line_edit_master->setReadOnly(true);
-			ui.line_edit_host->setReadOnly(true);
-			ui.line_edit_topic->setReadOnly(true);
-            ui.treeWidget->setEnabled(true);//连接成功时设置为可用,防止被意外调用
-            myqrviz = new qrviz(ui.Layout_rviz);
-		}
-	}
-}
-
-
-void MainWindow::on_checkbox_use_environment_stateChanged(int state) {
-	bool enabled;
-	if ( state == 0 ) {
-		enabled = true;
-	} else {
-		enabled = false;
-	}
-	ui.line_edit_master->setEnabled(enabled);
-	ui.line_edit_host->setEnabled(enabled);
-	//ui.line_edit_topic->setEnabled(enabled);
-}
-
-/*****************************************************************************
-** Implemenation [Slots][manually connected]
-*****************************************************************************/
-
-/**
- * This function is signalled by the underlying model. When the model changes,
- * this will drop the cursor down to the last line in the QListview to ensure
- * the user can always see the latest log message.
- */
-void MainWindow::updateLoggingView() {
-        ui.view_logging->scrollToBottom();
-}
-
-/*****************************************************************************
-** Implementation [Menu]
-*****************************************************************************/
-
-void MainWindow::on_actionAbout_triggered() {
-    QMessageBox::about(this, tr("About ..."),tr("<h2>PACKAGE_NAME Test Program 0.10</h2><p>Copyright Yujin Robot</p><p>This package needs an about description.</p>"));
-}
-
-/*****************************************************************************
-** Implementation [Configuration]
-*****************************************************************************/
-
 bool MainWindow::connectMaster(QString master_ip, QString ros_ip,
                                bool use_envirment) {
   //如果使用环境变量
@@ -783,22 +918,137 @@ bool MainWindow::connectMaster(QString master_ip, QString ros_ip,
   return true;
 }
 
-void MainWindow::initVideos()
+void MainWindow::slot_rosShutdown()
 {
-    QSettings video_topic_setting("rosqt_gui", "settings");
-    QStringList names = video_topic_setting.value("video/names").toStringList();
-    QStringList topics = video_topic_setting.value("video/topics").toStringList();
-    if (topics.size() == 4) {
-      if (topics[0] != "") qnode.Sub_Image(topics[0], 0);
-      if (topics[1] != "") qnode.Sub_Image(topics[1], 1);
-      if (topics[2] != "") qnode.Sub_Image(topics[2], 2);
-      if (topics[3] != "") qnode.Sub_Image(topics[3], 3);
-    }
-
-    //链接槽函数
-    connect(&qnode, SIGNAL(Show_image(int, QImage)), this,
-            SLOT(slot_show_image(int, QImage)));
+    slot_updateRobotStatus(RobotStatus::none);
 }
+
+//void MainWindow::slot_chartTimerTimeout()
+//{
+//    QImage image(600, 600, QImage::Format_RGB888);
+//    QPainter painter(&image);
+//    painter.setRenderHint(QPainter::Antialiasing);
+//    m_qgraphicsScene->render(&painter);
+//    qnode.pub_imageMap(image);
+//}
+
+//void MainWindow::slot_pubImageMapTimeOut()
+//{
+//    QImage image(600, 600, QImage::Format_RGB888);
+//    QPainter painter(&image);
+//    painter.setRenderHint(QPainter::Antialiasing);
+//    m_qgraphicsScene->render(&painter);
+//    qnode.pub_imageMap(image);
+//}
+//隐藏
+//void MainWindow::slot_hide_table_widget()
+//{
+//    if (ui.stackedWidget_left->isHidden()) {
+//      ui.stackedWidget_left->show();
+//    } else {
+//      ui.stackedWidget_left->hide();
+//      // ui.table_hide_btn->setStyleSheet("QPushButton{background-image:
+//      // url(://images/show.png);border:none;}");
+//    }
+//}
+
+//滑动条处理槽函数
+void MainWindow::slot_linear_value_change(int value)
+{
+    ui.label_linear->setText(QString::number(value));
+}
+//滑动条处理槽函数
+void MainWindow::slot_raw_value_change(int value)
+{
+    ui.label_raw->setText(QString::number(value));
+}
+
+MainWindow::~MainWindow() {
+    if (base_cmd) {
+      delete base_cmd;
+      base_cmd = NULL;
+    }
+}
+
+/*****************************************************************************
+** Implementation [Slots]
+*****************************************************************************/
+
+void MainWindow::showNoMasterMessage() {
+	QMessageBox msgBox;
+	msgBox.setText("Couldn't find the ros master.");
+	msgBox.exec();
+    close();
+}
+
+/*
+ * These triggers whenever the button is clicked, regardless of whether it
+ * is already checked or not.
+ */
+
+//void MainWindow::on_button_connect_clicked(bool check ) {
+//	if ( ui.checkbox_use_environment->isChecked() ) {
+//		if ( !qnode.init() ) {
+//			showNoMasterMessage();
+//            ui.treeWidget->setEnabled(false);//myrviz 对象没有连接上master时,设置为不可用
+//		} else {
+//			ui.button_connect->setEnabled(false);
+//            ui.treeWidget->setEnabled(true);//连接成功时设置为可用,防止被意外调用
+//            myqrviz = new qrviz(ui.Layout_rviz);
+//		}
+//	} else {
+// 		if ( ! qnode.init(ui.line_edit_master->text().toStdString(),
+//				   ui.line_edit_host->text().toStdString()) ) {
+//			showNoMasterMessage();
+//            ui.treeWidget->setEnabled(false);//myrviz 对象没有连接上master时,设置为不可用
+//		} else {
+//			ui.button_connect->setEnabled(false);
+//			ui.line_edit_master->setReadOnly(true);
+//			ui.line_edit_host->setReadOnly(true);
+//			ui.line_edit_topic->setReadOnly(true);
+//            ui.treeWidget->setEnabled(true);//连接成功时设置为可用,防止被意外调用
+//            myqrviz = new qrviz(ui.Layout_rviz);
+//		}
+//	}
+//}
+
+
+//void MainWindow::on_checkbox_use_environment_stateChanged(int state) {
+//	bool enabled;
+//	if ( state == 0 ) {
+//		enabled = true;
+//	} else {
+//		enabled = false;
+//	}
+//	ui.line_edit_master->setEnabled(enabled);
+//	ui.line_edit_host->setEnabled(enabled);
+//	//ui.line_edit_topic->setEnabled(enabled);
+//}
+
+/*****************************************************************************
+** Implemenation [Slots][manually connected]
+*****************************************************************************/
+
+/**
+ * This function is signalled by the underlying model. When the model changes,
+ * this will drop the cursor down to the last line in the QListview to ensure
+ * the user can always see the latest log message.
+ */
+void MainWindow::updateLoggingView() {
+        ui.view_logging->scrollToBottom();
+}
+
+/*****************************************************************************
+** Implementation [Menu]
+*****************************************************************************/
+
+void MainWindow::on_actionAbout_triggered() {
+    QMessageBox::about(this, tr("About ..."),tr("<h2>PACKAGE_NAME Test Program 0.10</h2><p>Copyright Yujin Robot</p><p>This package needs an about description.</p>"));
+}
+
+/*****************************************************************************
+** Implementation [Configuration]
+*****************************************************************************/
 
 void MainWindow::ReadSettings() {
     QSettings settings("rosqt_gui", "settings");
@@ -856,6 +1106,32 @@ void MainWindow::closeEvent(QCloseEvent *event)
 {
 	WriteSettings();
 	QMainWindow::closeEvent(event);
+}
+void MainWindow::mousePressEvent(QMouseEvent *event) {
+  m_lastPos = event->globalPos();
+  isPressedWidget = true;  // 当前鼠标按下的即是QWidget而非界面上布局的其它控件
+}
+void MainWindow::mouseMoveEvent(QMouseEvent *event) {
+  if (isPressedWidget) {
+    this->move(this->x() + (event->globalX() - m_lastPos.x()),
+               this->y() + (event->globalY() - m_lastPos.y()));
+    m_lastPos = event->globalPos();
+  }
+}
+void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
+  // 其实这里的mouseReleaseEvent函数可以不用重写
+  m_lastPos = event->globalPos();
+  isPressedWidget = false;  // 鼠标松开时，置为false
+}
+//最大化最小化关闭
+void MainWindow::slot_closeWindows() { this->close(); }
+void MainWindow::slot_minWindows() { this->showMinimized(); }
+void MainWindow::slot_maxWindows() {
+  if (this->isFullScreen()) {
+    this->showNormal();
+  } else {
+    this->showFullScreen();
+  }
 }
 
 }  // namespace rosqt_gui

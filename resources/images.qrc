@@ -128,5 +128,9 @@
         <file>images/wait2.gif</file>
         <file>images/wait3.gif</file>
         <file>images/warning.png</file>
+        <file>images/status/status_error.png</file>
+        <file>images/status/status_none.png</file>
+        <file>images/status/status_normal.png</file>
+        <file>images/status/status_warn.png</file>
     </qresource>
 </RCC>

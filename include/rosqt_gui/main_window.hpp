@@ -40,7 +40,7 @@
 *****************************************************************************/
 
 namespace rosqt_gui {
-
+enum RobotStatus { none, normal, warn, error };
 /*****************************************************************************
 ** Interface [MainWindow]
 *****************************************************************************/
@@ -62,7 +62,7 @@ public:
     void closeEvent(QCloseEvent *event); // Overloaded function
     void showNoMasterMessage();
     bool connectMaster(QString master_ip, QString ros_ip, bool use_envirment);
-
+    void initUis();
     void initVideos();
     enum SHOWMODE {
         robot,
@@ -74,8 +74,8 @@ public Q_SLOTS:
     ** Auto-connections (connectSlotsByName())
     *******************************************/
     void on_actionAbout_triggered();
-    void on_button_connect_clicked(bool check );
-    void on_checkbox_use_environment_stateChanged(int state);
+//    void on_button_connect_clicked(bool check );
+//    void on_checkbox_use_environment_stateChanged(int state);
 
     /******************************************
     ** Manual connections
@@ -85,7 +85,7 @@ public Q_SLOTS:
     void slot_raw_value_change(int);
     void slot_pushbtn_click();//几个按钮的点击事件,多个控制按钮连接同一个槽函数
     void slot_update_dashboard(float,float);//将节点发送来的信号响应设置到仪表盘上
-    void slot_update_power(float);
+   //void slot_update_power(float);
     void slot_update_image(QImage);
     void slot_sub_image();
     void slot_quick_cmd_laser();
@@ -108,6 +108,9 @@ public Q_SLOTS:
     //遥感
     void slot_rockKeyChange(int);
     void slot_batteryState(sensor_msgs::BatteryState);
+    void slot_rosShutdown();
+    //设置界面
+    void slot_setting_frame();
 
     void slot_speed_x(double x);
     void slot_speed_yaw(double yaw);
@@ -116,14 +119,29 @@ public Q_SLOTS:
     //显示图像
     void slot_show_image(int, QImage);
     void slot_dis_connect();
-    void slot_hide_table_widget();
+    //void slot_hide_table_widget();
     void slot_closeWindows();
     void slot_minWindows();
     void slot_maxWindows();
-    void slot_chartTimerTimeout();
-    void slot_pubImageMapTimeOut();
-    void slot_updateCursorPos(QPointF pos);
-    void slot_changeMapType(int);
+//    void slot_chartTimerTimeout();
+//    void slot_pubImageMapTimeOut();
+// void slot_updateCursorPos(QPointF pos);
+// void slot_changeMapType(int);
+    void slot_updateRobotStatus(RobotStatus);
+
+private:
+    void connections();
+    void display_rviz();
+    void mousePressEvent(QMouseEvent *event);
+    void mouseMoveEvent(QMouseEvent *event);
+    void mouseReleaseEvent(QMouseEvent *event);
+
+signals:
+    void signalSetMoveCamera();
+    void signalSet2DPose();
+    void signalSet2DGoal();
+    void signalDisconnect();
+
 private:
     Ui::MainWindowDesign ui;
     QNode qnode;
@@ -158,15 +176,13 @@ private:
     QComboBox* LocalMapColorScheme_box;
     QComboBox* Local_Planner_Topic_box;
     QComboBox* Local_Planner_Color_box;
-    //遥感
+    //遥感s
     JoyStick *rock_widget;
-
-signals:
-    void signalSetMoveCamera();
-    void signalSet2DPose();
-    void signalSet2DGoal();
-    void signalDisconnect();
-
+    //QGraphicsScene *m_qgraphicsScene = NULL;
+    QTimer *m_timerCurrentTime;
+    bool isPressedWidget;
+    QPoint m_lastPos;
+    QProcess *base_cmd = NULL;
 };
 
 }  // namespace rosqt_gui

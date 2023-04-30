@@ -10,29 +10,24 @@
 #include <QPainter>
 #include <QPropertyAnimation>
 #include <QStringListModel>
-#include <QSettings>
 
 #include "../include/rosqt_gui/main_window.hpp"
 
 loginsetting::loginsetting(QWidget *parent) :
-    QWidget(parent),
+    CustomMoveWidget(parent),
     ui(new Ui::loginsetting)
 {
       ui->setupUi(this);
   ui->btnWinClose->setIcon(QIcon(":/images/close.png"));
   ui->btnWinMin->setIcon(QIcon(":/images/min.png"));
-  ui->btnWinClose_2->setIcon(QIcon("://images/close.png"));
-  ui->btnWinMin_2->setIcon(QIcon(":/images/close.png"));
+  ui->btnWinClose_2->setIcon(QIcon(":/images/close.png"));
+  ui->btnWinMin_2->setIcon(QIcon(":/images/min.png"));
   this->setAttribute(Qt::WA_TranslucentBackground);
   this->setWindowFlags(Qt::FramelessWindowHint);
 
-  this->setWindowFlags(Qt::FramelessWindowHint);  //去掉标题栏
+ this->setWindowFlags(Qt::FramelessWindowHint);  //去掉标题栏
   InitWidget();
   readSettings();
-//  QMovie *movie = new QMovie(":/background/background.gif");
-//  ui->label_video->setMovie(movie);
-//  movie->start();
-  // ip
   foreach (QHostAddress address, QNetworkInterface::allAddresses()) {
     if (address.protocol() == QAbstractSocket::IPv4Protocol) {
       QString addre = address.toString();
@@ -55,11 +50,6 @@ loginsetting::loginsetting(QWidget *parent) :
   });
   connect(ui->pushButton_setting, &QPushButton::clicked,
           [=]() { ui->stackedWidget->setCurrentIndex(1); });
-//  connect(ui->pushButton_hellp, &QPushButton::clicked, [=]() {
-//    QDesktopServices::openUrl(
-//        QUrl(QString("https://github.com/chengyangkj/rosqt_gui/blob/"
-//                     "master/README.md")));
-//  });
   connect(ui->pushButton_return, &QPushButton::clicked, [=]() {
     QMessageBox msg(this);                  //对话框设置父组件
     msg.setWindowTitle("返回主界面");       //对话框标题

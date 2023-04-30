@@ -5,7 +5,7 @@
 #include <QDesktopServices>
 #include <QSpinBox>
 
-#include "./basewidget/customwidget.h"
+#include "../../basewidget/customwidget.h"
 #include "main_window.hpp"
 #include <QWidget>
 
@@ -13,7 +13,7 @@ namespace Ui {
 class loginsetting;
 }
 
-class loginsetting : public QWidget
+class loginsetting : public CustomMoveWidget
 {
     Q_OBJECT
 

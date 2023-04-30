@@ -11,7 +11,9 @@
 
 #include <QtGui>
 #include <QApplication>
-#include "../include/rosqt_gui/main_window.hpp"
+#include <QDesktopWidget>
+//#include "../include/rosqt_gui/main_window.hpp"
+#include "../include/rosqt_gui/loginsetting.h"
 
 /*****************************************************************************
 ** Main
@@ -23,7 +25,8 @@ int main(int argc, char **argv) {
     ** Qt
     **********************/
     QApplication app(argc, argv);
-    rosqt_gui::MainWindow w(argc,argv);
+   // rosqt_gui::MainWindow w(argc,argv);
+    loginsetting w;
     w.show();
     app.connect(&app, SIGNAL(lastWindowClosed()), &app, SLOT(quit()));
     int result = app.exec();
